@@ -38,14 +38,12 @@ export class UsersService {
         this.users.create({ email, password, role }),
       );
       const verification = await this.verifications.save(
-        this.verifications.create({
-          user,
-        }),
+        this.verifications.create({ user }),
       );
       this.mailService.sendVerificationEmail(user.email, verification.code);
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: 'Cound not create account' };
+      return { ok: false, error: 'Could not create account' };
     }
   }
 
@@ -65,16 +63,14 @@ export class UsersService {
       const token = this.jwtService.sign({ id: user.id });
       return { ok: true, token };
     } catch (error) {
-      return { ok: false, error };
+      return { ok: false, error: 'Could not log in' };
     }
   }
 
   async findById(id: number): Promise<UserProfileOutput> {
     try {
-      const user = await this.users.findOne({ id });
-      if (user) {
-        return { ok: true, user };
-      }
+      const user = await this.users.findOneOrFail({ id });
+      return { ok: true, user };
     } catch (error) {
       return { ok: false, error: 'User not found' };
     }
@@ -120,7 +116,7 @@ export class UsersService {
       }
       return { ok: false, error: 'Verification not found' };
     } catch (error) {
-      return { ok: false, error };
+      return { ok: false, error: 'Could not verify email' };
     }
   }
 }
