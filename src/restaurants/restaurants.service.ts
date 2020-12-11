@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PAGINATION_NUMBER } from 'src/common/common.constants';
 import { User } from 'src/users/entities/user.entity';
 import { ILike, Raw, Repository } from 'typeorm';
 import { AllCategoriesOutput } from './dtos/all-categories.dto';
@@ -43,14 +44,14 @@ export class RestaurantsService {
   async allRestaurants({ page }: RestaurantsInput): Promise<RestaurantsOutput> {
     try {
       const [restaurants, totalResults] = await this.restaurants.findAndCount({
-        take: 25,
-        skip: (page - 1) * 25,
+        take: PAGINATION_NUMBER,
+        skip: (page - 1) * PAGINATION_NUMBER,
       });
       return {
         ok: true,
         restaurants,
         totalResults,
-        totalPages: Math.ceil(totalResults / 25),
+        totalPages: Math.ceil(totalResults / PAGINATION_NUMBER),
       };
     } catch (error) {
       return { ok: false, error: 'Could not find restaurants' };
@@ -82,14 +83,14 @@ export class RestaurantsService {
           // name: ILike(`%${query}%`),
           name: Raw((name) => `${name} ILIKE '%${query}%'`),
         },
-        take: 25,
-        skip: (page - 1) * 25,
+        take: PAGINATION_NUMBER,
+        skip: (page - 1) * PAGINATION_NUMBER,
       });
       return {
         ok: true,
         restaurants,
         totalResults,
-        totalPages: Math.ceil(totalResults / 25),
+        totalPages: Math.ceil(totalResults / PAGINATION_NUMBER),
       };
     } catch (error) {
       return { ok: false, error: `Could not find ${query}` };
@@ -193,8 +194,8 @@ export class RestaurantsService {
       }
       const restaurants = await this.restaurants.find({
         where: { category },
-        take: 25,
-        skip: (page - 1) * 25,
+        take: PAGINATION_NUMBER,
+        skip: (page - 1) * PAGINATION_NUMBER,
       });
       const totalResults = await this.countRestaurants(category);
       return {
@@ -202,7 +203,7 @@ export class RestaurantsService {
         category,
         restaurants,
         totalResults,
-        totalPages: Math.ceil(totalResults / 25),
+        totalPages: Math.ceil(totalResults / PAGINATION_NUMBER),
       };
     } catch (error) {
       return { ok: false, error: 'Could not find category' };

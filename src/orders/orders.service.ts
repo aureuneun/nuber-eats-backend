@@ -1,5 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PubSub } from 'graphql-subscriptions';
+import {
+  NEW_COOKED_ORDER,
+  NEW_ORDER_UPDATES,
+  NEW_PENDING_ORDER,
+  PUB_SUB,
+} from 'src/common/common.constants';
 import { Dish } from 'src/restaurants/entities/dish.entity';
 import { Restaurant } from 'src/restaurants/entities/restaurant.entity';
 import { User, UserRole } from 'src/users/entities/user.entity';
@@ -8,6 +15,7 @@ import { CreateOrderInput, CreateOrderOutput } from './dtos/create-order.dto';
 import { EditOrderInput, EditOrderOutput } from './dtos/edit-order.dto';
 import { GetOrderInput, GetOrderOutput } from './dtos/get-order.dto';
 import { GetOrdersInput, GetOrdersOutput } from './dtos/get-orders.dto';
+import { TakeOrderInput, TakeOrderOutput } from './dtos/take-order.dto';
 import { Order, OrderStatus } from './entities/oder.entity';
 import { OrderItem } from './entities/order-item.entity';
 
@@ -21,6 +29,7 @@ export class OrdersService {
     private readonly restaurants: Repository<Restaurant>,
     @InjectRepository(Dish)
     private readonly dishes: Repository<Dish>,
+    @Inject(PUB_SUB) private readonly pubsub: PubSub,
   ) {}
 
   async getOrders(
@@ -125,7 +134,7 @@ export class OrdersService {
         );
         orderItems.push(orderItem);
       }
-      await this.orders.save(
+      const order = await this.orders.save(
         this.orders.create({
           customer,
           restaurant,
@@ -133,6 +142,9 @@ export class OrdersService {
           items: orderItems,
         }),
       );
+      this.pubsub.publish(NEW_PENDING_ORDER, {
+        pendingOrders: { order, ownerId: restaurant.ownerId },
+      });
       return { ok: true };
     } catch (error) {
       return { ok: false, error: 'Could not create order' };
@@ -144,9 +156,7 @@ export class OrdersService {
     { id: orderId, status }: EditOrderInput,
   ): Promise<EditOrderOutput> {
     try {
-      const order = await this.orders.findOne(orderId, {
-        relations: ['restaurant'],
-      });
+      const order = await this.orders.findOne(orderId);
       if (!order) {
         return { ok: false, error: 'Order not found' };
       }
@@ -169,9 +179,39 @@ export class OrdersService {
         return { ok: false, error: 'You can not edit that' };
       }
       await this.orders.save({ id: orderId, status });
+      if (user.role === UserRole.Owner && status === OrderStatus.Cooked) {
+        this.pubsub.publish(NEW_COOKED_ORDER, {
+          cookedOrder: { ...order, status },
+        });
+      }
+      this.pubsub.publish(NEW_ORDER_UPDATES, {
+        orderUpdates: { ...order, status },
+      });
       return { ok: true };
     } catch (error) {
       return { ok: false, error: 'Could not edit order' };
+    }
+  }
+
+  async takeOrder(
+    driver: User,
+    { id: orderId }: TakeOrderInput,
+  ): Promise<TakeOrderOutput> {
+    try {
+      const order = await this.orders.findOne(orderId);
+      if (!order) {
+        return { ok: false, error: 'Order not found' };
+      }
+      if (order.driverId) {
+        return { ok: false, error: 'This order already has a driver' };
+      }
+      await this.orders.save({ id: orderId, driver });
+      this.pubsub.publish(NEW_ORDER_UPDATES, {
+        orderUpdates: { ...order, driver },
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: 'Could not take order' };
     }
   }
 }
