@@ -21,6 +21,7 @@ import { OrderItem } from './orders/entities/order-item.entity';
 import { CommonModule } from './common/common.module';
 import { PaymentsModule } from './payments/payments.module';
 import { Payment } from './payments/entities/payment.entity';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { Payment } from './payments/entities/payment.entity';
         MAILGUN_FROM_EMAIL: Joi.string().required(),
       }),
     }),
+    ScheduleModule.forRoot(),
     GraphQLModule.forRoot({
       installSubscriptionHandlers: true,
       autoSchemaFile: true,
